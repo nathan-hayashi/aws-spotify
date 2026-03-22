@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowedServices",
+      "Effect": "Allow",
+      "Action": [
+        "s3:*",
+        "ec2:*",
+        "cognito-idp:*",
+        "cloudfront:*",
+        "cloudwatch:*",
+        "logs:*",
+        "secretsmanager:GetSecretValue",
+        "kms:Decrypt",
+        "kms:GenerateDataKey"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
+    },
+    {
+      "Sid": "DenyDangerousActions",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*",
+        "account:*",
+        "iam:CreateUser",
+        "iam:DeleteUser",
+        "iam:CreateAccountAlias",
+        "iam:DeleteAccountAlias"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

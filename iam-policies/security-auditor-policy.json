@@ -1,0 +1,72 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecurityAuditReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "iam:Get*",
+        "iam:List*",
+        "iam:GenerateCredentialReport",
+        "iam:GenerateServiceLastAccessedDetails",
+        "iam:SimulateCustomPolicy",
+        "iam:SimulatePrincipalPolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudTrailAccess",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:LookupEvents",
+        "cloudtrail:GetTrailStatus",
+        "cloudtrail:DescribeTrails",
+        "cloudtrail:GetEventSelectors"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ConfigAccess",
+      "Effect": "Allow",
+      "Action": [
+        "config:Describe*",
+        "config:Get*",
+        "config:List*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GuardDutyAccess",
+      "Effect": "Allow",
+      "Action": [
+        "guardduty:Get*",
+        "guardduty:List*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AccessAnalyzerAccess",
+      "Effect": "Allow",
+      "Action": [
+        "access-analyzer:Get*",
+        "access-analyzer:List*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyMutations",
+      "Effect": "Deny",
+      "Action": [
+        "iam:Create*",
+        "iam:Delete*",
+        "iam:Update*",
+        "iam:Put*",
+        "iam:Attach*",
+        "iam:Detach*",
+        "iam:Add*",
+        "iam:Remove*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
