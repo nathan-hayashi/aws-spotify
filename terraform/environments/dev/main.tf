@@ -70,3 +70,63 @@ output "ec2_public_ip" {
 output "ec2_instance_id" {
   value = module.ec2.instance_id
 }
+
+data "aws_caller_identity" "current" {}
+
+module "s3" {
+  source = "../../modules/s3"
+
+  project_name = var.project_name
+  account_id   = data.aws_caller_identity.current.account_id
+}
+
+output "audio_bucket" {
+  value = module.s3.audio_bucket_name
+}
+
+output "frontend_bucket" {
+  value = module.s3.frontend_bucket_name
+}
+
+variable "alert_email" {
+  type = string
+}
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_name    = var.project_name
+  alert_email     = var.alert_email
+  ec2_instance_id = module.ec2.instance_id
+}
+
+module "cloudfront" {
+  source = "../../modules/cloudfront"
+
+  project_name                         = var.project_name
+  frontend_bucket_regional_domain_name = module.s3.frontend_bucket_regional_domain_name
+  frontend_bucket_id                   = module.s3.frontend_bucket_name
+  ec2_public_dns                       = module.ec2.public_dns
+}
+
+output "cloudfront_url" {
+  value = "https://${module.cloudfront.distribution_domain_name}"
+}
+
+module "cognito" {
+  source = "../../modules/cognito"
+
+  project_name = var.project_name
+}
+
+output "cognito_user_pool_id" {
+  value = module.cognito.user_pool_id
+}
+
+output "cognito_frontend_client_id" {
+  value = module.cognito.frontend_client_id
+}
+
+output "cognito_endpoint" {
+  value = module.cognito.cognito_endpoint
+}

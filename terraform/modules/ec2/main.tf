@@ -105,3 +105,7 @@ output "public_ip" {
 output "private_ip" {
   value = aws_instance.api_server.private_ip
 }
+
+output "public_dns" {
+  value = aws_eip.api.public_dns
+}
