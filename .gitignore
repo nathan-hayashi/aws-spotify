@@ -40,3 +40,9 @@ terraform.rc
 # SSH keys
 ssh/
 
+.env
+
+node_modules/
+
+
+
