@@ -13,5 +13,5 @@
         "*.tfvars": "terraform"
 },
     "terraform.languageServer.enable": true,
-    "terraform.validation.enableEnhancedValidation": true
+    "terraform.validation.enableEnhancedValidation": false
 }

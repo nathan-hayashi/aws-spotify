@@ -738,5 +738,99 @@ LESSON LEARNED:
 
 
 ================================================================================
+25. HEREDOC INDENTATION — EOF MARKER WITH LEADING SPACES
+================================================================================
+Date: 2026-03-24
+
+WHAT HAPPENED:
+  Multiple attempts to create /tmp/bucket-policy.json via heredoc failed.
+  Bash showed the > continuation prompt instead of completing the command.
+  The bucket policy was never written, blocking the AWS Config setup.
+
+WHY:
+  When pasting multi-line heredoc commands, the terminal auto-indented the
+  content including the closing EOF marker. Heredoc closing markers (EOF) MUST
+  start at column 1 with zero leading whitespace. Any spaces before EOF cause
+  bash to treat it as content, not as the terminator.
+
+HOW IT WAS FIXED:
+  Abandoned heredocs entirely. Used nano to create the JSON file manually:
+    nano /tmp/bucket-policy.json
+  Then referenced it with file:// in the AWS CLI command.
+
+LESSON LEARNED:
+  Heredocs are unreliable when pasting into terminals that auto-indent.
+  For JSON policy files, always use nano/vi to create the file, then reference
+  it with file:// — the same pattern used for iam-policies/. This is now a
+  recurring pattern (see also issue #7 with SQL heredocs).
+
+
+================================================================================
+26. AWS CLI --policy AND file:// SPLIT ACROSS LINES
+================================================================================
+Date: 2026-03-24
+
+WHAT HAPPENED:
+  aws s3api put-bucket-policy --bucket ... --policy file:///tmp/bucket-policy.json
+  kept failing with: "argument --policy: expected one argument"
+  Followed by: "-bash: file:///tmp/bucket-policy.json: No such file or directory"
+
+WHY:
+  When pasting the command, a line break was inserted between --policy and
+  file://. Bash interpreted --policy (alone) as having no value, then treated
+  file:///tmp/bucket-policy.json as a separate command to execute. The second
+  error is bash trying to run "file:///tmp/..." as a shell command.
+
+HOW IT WAS FIXED:
+  Typed the command manually on a single line instead of pasting. Ensured
+  --policy and file:// had no line break between them.
+
+LESSON LEARNED:
+  AWS CLI flag-value pairs must be on the same line. When pasting long
+  commands, verify no line breaks split a flag from its value. When in doubt,
+  type it out manually rather than pasting.
+
+
+================================================================================
+27. FRONTEND BUILD AND DEPLOYMENT
+================================================================================
+Date: 2026-03-24
+
+WHAT HAPPENED:
+  Frontend React app was built and deployed to S3:
+  - Initialized npm project in frontend/
+  - Installed React, Vite, and created App.jsx with search + playback UI
+  - Built with npm run build
+  - Synced to S3: aws s3 sync frontend/dist/ s3://spotify-frontend-037336516853/
+
+CHANGES MADE:
+  - CloudFront origin http_port changed from 80 to 3000 (API server port)
+  - Added security group ingress rule for port 3000 (API server)
+  - Created CloudFormation supplementary templates (vpc-networking.yaml, s3-security.yaml)
+  - Created simulated incident postmortem (INC-001-s3-public-exposure.md)
+  - Created GRC documentation (governance-risk-compliance.md)
+  - Set up AWS Config: recorder, delivery channel, 4 compliance rules
+
+NOT AN ERROR — documented for completeness as these were significant project milestones.
+
+
+================================================================================
+WSL COMMAND HISTORY REFERENCE (UPDATED)
+================================================================================
+
+Updated history file covers lines 1-3929.
+
+Key sections added since last update:
+  Lines 3004-3340:  Frontend React app creation (App.jsx, vite config, build)
+  Lines 3340-3360:  S3 frontend deploy, CloudFront port fix, SG rule addition
+  Lines 3360-3615:  CloudFormation templates (VPC, S3) and README
+  Lines 3613-3690:  AWS Config rules setup (failed, then succeeded after
+                    bucket policy fix and recorder/delivery channel setup)
+  Lines 3691-3790:  Simulated incident postmortem document
+  Lines 3791-3916:  GRC documentation (governance, risk matrix, NIST/CIS mapping)
+  Lines 3918-3929:  Git commit and push
+
+
+================================================================================
 END OF DEBUGGING LOG
 ================================================================================

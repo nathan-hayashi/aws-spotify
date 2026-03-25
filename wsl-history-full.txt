@@ -3001,3 +3001,928 @@ cat .gitignore
 ```
 history
 history -w ~/wsl-history-full.txt
+cd frontend
+npm init -y
+npm install react react-dom
+npm install -D vite @vitejs/plugin-react
+cat > /mnt/c/dev/aws-spotify/frontend/vite.config.js << 'EOF'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: "dist",
+  },
+});
+EOF
+
+cat > /mnt/c/dev/aws-spotify/frontend/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify — AWS Portfolio Project</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
+EOF
+
+mkdir -p /mnt/c/dev/aws-spotify/frontend/src
+cat > /mnt/c/dev/aws-spotify/frontend/src/main.jsx << 'EOF'
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+
+createRoot(document.getElementById("root")).render(<App />);
+EOF
+
+cat > /mnt/c/dev/aws-spotify/frontend/src/App.jsx << 'JSXEOF'
+import React, { useState, useEffect, useRef } from "react";
+
+const API_BASE = window.location.origin + "/api";
+
+const styles = {
+  app: {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    background: "#121212",
+    color: "#fff",
+    minHeight: "100vh",
+    padding: 0,
+    margin: 0,
+  },
+  header: {
+    background: "#1DB954",
+    padding: "16px 24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  logo: {
+    fontSize: "20px",
+    fontWeight: 700,
+    color: "#fff",
+    margin: 0,
+  },
+  badge: {
+    fontSize: "11px",
+    background: "rgba(0,0,0,0.3)",
+    padding: "4px 10px",
+    borderRadius: "12px",
+    color: "#fff",
+  },
+  searchBar: {
+    padding: "16px 24px",
+    background: "#181818",
+  },
+  input: {
+    width: "100%",
+    maxWidth: "480px",
+    padding: "10px 16px",
+    borderRadius: "24px",
+    border: "none",
+    background: "#282828",
+    color: "#fff",
+    fontSize: "14px",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+  songList: {
+    padding: "8px 24px",
+  },
+  songRow: {
+    display: "flex",
+    alignItems: "center",
+    padding: "10px 16px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    transition: "background 0.15s",
+    gap: "16px",
+  },
+  songIndex: {
+    width: "24px",
+    textAlign: "right",
+    color: "#b3b3b3",
+    fontSize: "14px",
+    flexShrink: 0,
+  },
+  songInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  songTitle: {
+    fontSize: "15px",
+    fontWeight: 500,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  songArtist: {
+    fontSize: "13px",
+    color: "#b3b3b3",
+    marginTop: "2px",
+  },
+  songDuration: {
+    color: "#b3b3b3",
+    fontSize: "13px",
+    flexShrink: 0,
+  },
+  player: {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    background: "#282828",
+    borderTop: "1px solid #333",
+    padding: "12px 24px",
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  },
+  playerInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  playerTitle: {
+    fontSize: "14px",
+    fontWeight: 500,
+  },
+  playerArtist: {
+    fontSize: "12px",
+    color: "#b3b3b3",
+  },
+  playBtn: {
+    background: "#1DB954",
+    border: "none",
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    fontSize: "16px",
+    color: "#fff",
+  },
+  status: {
+    fontSize: "12px",
+    color: "#b3b3b3",
+    padding: "8px 24px",
+  },
+};
+
+function formatDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export default function App() {
+  const [songs, setSongs] = useState([]);
+  const [query, setQuery] = useState("");
+  const [currentSong, setCurrentSong] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [health, setHealth] = useState(null);
+  const audioRef = useRef(new Audio());
+
+  useEffect(() => {
+    fetch(`${API_BASE}/health`)
+      .then((r) => r.json())
+      .then(setHealth)
+      .catch(() => setHealth({ status: "unreachable" }));
+    loadSongs();
+  }, []);
+
+  async function loadSongs() {
+    try {
+      const res = await fetch(`${API_BASE}/songs?limit=50`);
+      const data = await res.json();
+      setSongs(data.songs || []);
+    } catch (err) {
+      console.error("Failed to load songs:", err);
+    }
+  }
+
+  async function search(q) {
+    setQuery(q);
+    if (!q.trim()) return loadSongs();
+    try {
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}&type=song`);
+      const data = await res.json();
+      setSongs(data.songs || []);
+    } catch (err) {
+      console.error("Search failed:", err);
+    }
+  }
+
+  async function playSong(song) {
+    try {
+      const res = await fetch(`${API_BASE}/songs/${song.song_id}`);
+      const data = await res.json();
+
+      audioRef.current.pause();
+      audioRef.current.src = data.stream_url;
+      audioRef.current.play().catch(() => {});
+      setCurrentSong(data);
+      setIsPlaying(true);
+
+      audioRef.current.onended = () => setIsPlaying(false);
+    } catch (err) {
+      console.error("Play failed:", err);
+    }
+  }
+
+  function togglePlay() {
+    if (!currentSong) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+  }
+
+  return (
+    <div style={styles.app}>
+      <header style={styles.header}>
+        <h1 style={styles.logo}>Spotify AWS</h1>
+        <span style={styles.badge}>
+          {health?.status === "healthy" ? "API Connected" : "API Offline"}
+        </span>
+      </header>
+
+      <div style={styles.searchBar}>
+        <input
+          style={styles.input}
+          type="text"
+          placeholder="Search songs or artists..."
+          value={query}
+          onChange={(e) => search(e.target.value)}
+        />
+      </div>
+
+      <div style={styles.status}>
+        {songs.length} songs {query && `matching "${query}"`}
+      </div>
+
+      <div style={styles.songList}>
+        {songs.map((song, i) => (
+          <div
+            key={song.song_id}
+            style={{
+              ...styles.songRow,
+              background:
+                currentSong?.song_id === song.song_id
+                  ? "rgba(29,185,84,0.15)"
+                  : "transparent",
+            }}
+            onClick={() => playSong(song)}
+            onMouseEnter={(e) => {
+              if (currentSong?.song_id !== song.song_id)
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+            }}
+            onMouseLeave={(e) => {
+              if (currentSong?.song_id !== song.song_id)
+                e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <span style={styles.songIndex}>{i + 1}</span>
+            <div style={styles.songInfo}>
+              <div
+                style={{
+                  ...styles.songTitle,
+                  color:
+                    currentSong?.song_id === song.song_id ? "#1DB954" : "#fff",
+                }}
+              >
+                {song.title}
+              </div>
+              <div style={styles.songArtist}>{song.artist_name}</div>
+            </div>
+            <span style={styles.songDuration}>
+              {formatDuration(song.duration)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {currentSong && (
+        <div style={styles.player}>
+          <button style={styles.playBtn} onClick={togglePlay}>
+            {isPlaying ? "\u275A\u275A" : "\u25B6"}
+          </button>
+          <div style={styles.playerInfo}>
+            <div style={styles.playerTitle}>{currentSong.title}</div>
+            <div style={styles.playerArtist}>{currentSong.artist?.name}</div>
+          </div>
+          <span style={{ fontSize: "12px", color: "#b3b3b3" }}>
+            {formatDuration(currentSong.duration)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+JSXEOF
+
+cd .
+cd ..
+cd frontend
+npx json -I -f package.json -e 'this.scripts = { dev: "vite", build: "vite build", preview: "vite preview" }'
+npm run build
+aws s3 sync /mnt/c/dev/aws-spotify/frontend/dist/ s3://spotify-frontend-037336516853/ --delete
+cd /mnt/c/dev/aws-spotify/terraform/environments/dev
+terraform output cloudfront_url
+ssh -i ~/.ssh/id_ed25519_spotify ec2-user@34.195.227.70
+sed -i 's/http_port              = 80/http_port              = 3000/' /mnt/c/dev/aws-spotify/terraform/modules/cloudfront/main.tf
+cat >> /mnt/c/dev/aws-spotify/terraform/modules/vpc/main.tf << 'EOF'
+
+resource "aws_vpc_security_group_ingress_rule" "api" {
+  security_group_id = aws_security_group.api.id
+  description       = "API server port"
+  from_port         = 3000
+  to_port           = 3000
+  ip_protocol       = "tcp"
+  cidr_ipv4         = "0.0.0.0/0"
+}
+EOF
+
+terraform plan -out=tfplan
+terraform apply "tfplan"
+terraform output cloudfront_url
+mkdir -p /mnt/c/dev/aws-spotify/cloudformation
+cat > /mnt/c/dev/aws-spotify/cloudformation/vpc-networking.yaml << 'EOF'
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Spotify Project - VPC and Networking (CloudFormation supplementary example)'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spotify
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+  PublicSubnetCidr:
+    Type: String
+    Default: '10.0.1.0/24'
+  AdminIP:
+    Type: String
+    Description: 'Your IP for SSH access (x.x.x.x/32)'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/32'
+    ConstraintDescription: 'Must be a valid IP with /32 mask'
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-vpc'
+        - Key: ManagedBy
+          Value: cloudformation
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-igw'
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-public-subnet'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-public-rt'
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  APISecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Spotify API server
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AdminIP
+          Description: SSH from admin IP
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: API server
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !Ref VpcCidr
+          Description: PostgreSQL VPC-only
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-api-sg'
+
+Outputs:
+  VpcId:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${ProjectName}-VpcId'
+  SubnetId:
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub '${ProjectName}-SubnetId'
+  SecurityGroupId:
+    Value: !Ref APISecurityGroup
+    Export:
+      Name: !Sub '${ProjectName}-SecurityGroupId'
+EOF
+
+cat > /mnt/c/dev/aws-spotify/cloudformation/s3-security.yaml << 'EOF'
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Spotify Project - S3 Buckets with Security Controls (CloudFormation supplementary example)'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spotify
+
+Resources:
+  AudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-audio-${AWS::AccountId}-cf'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: move-old-versions-to-ia
+            Status: Enabled
+            NoncurrentVersionTransition:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, HEAD]
+            AllowedOrigins:
+              - 'https://*.cloudfront.net'
+              - 'http://localhost:3000'
+            ExposedHeaders:
+              - Content-Length
+              - Content-Range
+              - Accept-Ranges
+            MaxAge: 3600
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-audio'
+        - Key: ManagedBy
+          Value: cloudformation
+
+  AudioBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AudioBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyUnencryptedUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub '${AudioBucket.Arn}/*'
+            Condition:
+              StringNotEquals:
+                s3:x-amz-server-side-encryption: AES256
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt AudioBucket.Arn
+              - !Sub '${AudioBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+Outputs:
+  AudioBucketName:
+    Value: !Ref AudioBucket
+    Export:
+      Name: !Sub '${ProjectName}-AudioBucketName'
+  AudioBucketArn:
+    Value: !GetAtt AudioBucket.Arn
+    Export:
+      Name: !Sub '${ProjectName}-AudioBucketArn'
+EOF
+
+cat > /mnt/c/dev/aws-spotify/cloudformation/README.md << 'EOF'
+# CloudFormation Supplementary Templates
+
+These templates implement the same infrastructure as the Terraform modules in `/terraform/modules/` for comparison purposes. They are NOT deployed — the Terraform versions are the live infrastructure.
+
+## Templates
+
+| Template | Terraform Equivalent | Resources |
+|----------|---------------------|-----------|
+| `vpc-networking.yaml` | `terraform/modules/vpc/` | VPC, subnet, IGW, route table, security group |
+| `s3-security.yaml` | `terraform/modules/s3/` | Audio bucket with encryption, versioning, lifecycle, CORS, bucket policy |
+
+## Key Differences: Terraform vs CloudFormation
+
+| Aspect | Terraform | CloudFormation |
+|--------|-----------|---------------|
+| State management | You manage (local or S3 backend) | AWS manages automatically |
+| Rollback | Manual — no auto-rollback | Automatic rollback on failure |
+| Multi-cloud | Yes (AWS, GCP, Azure) | AWS only |
+| Resource import | `terraform import` | CloudFormation import |
+| Selective destroy | Target specific resources | Delete entire stack |
+| Validation | `terraform validate` + `plan` | `aws cloudformation validate-template` |
+| Drift detection | `terraform plan` shows drift | Stack drift detection |
+
+## How to validate (without deploying)
+```bash
+aws cloudformation validate-template --template-body file://vpc-networking.yaml
+aws cloudformation validate-template --template-body file://s3-security.yaml
+```
+
+## How you WOULD deploy (don't — Terraform manages the live infra)
+```bash
+aws cloudformation create-stack \
+  --stack-name spotify-vpc \
+  --template-body file://vpc-networking.yaml \
+  --parameters ParameterKey=AdminIP,ParameterValue=YOUR_IP/32
+```
+EOF
+
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "s3-bucket-server-side-encryption-enabled",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "ec2-instances-in-vpc",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "INSTANCES_IN_VPC"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "root-account-mfa-enabled",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "ROOT_ACCOUNT_MFA_ENABLED"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "iam-root-access-key-check",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "IAM_ROOT_ACCESS_KEY_CHECK"
+  }
+}'
+aws configservice put-configuration-recorder --configuration-recorder name=default,roleARN=arn:aws:iam::037336516853:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig --recording-group allSupported=true
+aws configservice put-delivery-channel --delivery-channel name=default,s3BucketName=spotify-cloudtrail-037336516853
+aws configservice start-configuration-recorder --configuration-recorder-name default
+aws configservice put-configuration-recorder --configuration-recorder name=default,roleARN=arn:aws:iam::037336516853:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig --recording-group allSupported=true
+aws configservice put-delivery-channel --delivery-channel name=default,s3BucketName=spotify-cloudtrail-037336516853
+aws configservice start-configuration-recorder --configuration-recorder-name default
+ssh -i ~/.ssh/id_ed25519_spotify ec2-user@34.195.227.70
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+cd ..
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+aws s3api put-bucket-policy --bucket spotify-cloudtrail-${ACCOUNT_ID} --policy
+aws configservice put-delivery-channel     --delivery-channel name=default,s3BucketName=spotify-cloudtrail-${ACCOUNT_ID}
+cat /tmp/bucket-policy.json
+nano /tmp/bucket-policy.json
+aws s3api put-bucket-policy --bucket spotify-cloudtrail-037336516853 --policy
+aws
+aws s3api put-bucket-policy --bucket spotify-cloudtrail-037336516853 --policy
+aws s3api put-bucket-policy --bucket spotify-cloudtrail-037336516853 --policy file:///tmp/bucket-policy.json
+aws configservice put-delivery-channel \ --delivery-channel name=default,s3BucketName=spotify-cloudtrail-${ACCOUNT_ID}
+aws configservice put-delivery-channel \--delivery-channel name=default,s3BucketName=spotify-cloudtrail-${ACCOUNT_ID}
+aws configservice start-configuration-recorder --configuration-recorder-name default
+aws configservice describe-configuration-recorder-status
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "s3-bucket-server-side-encryption-enabled",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "ec2-instances-in-vpc",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "INSTANCES_IN_VPC"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "root-account-mfa-enabled",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "ROOT_ACCOUNT_MFA_ENABLED"
+  }
+}'
+aws configservice put-config-rule --config-rule '{
+  "ConfigRuleName": "iam-root-access-key-check",
+  "Source": {
+    "Owner": "AWS",
+    "SourceIdentifier": "IAM_ROOT_ACCESS_KEY_CHECK"
+  }
+}'
+mkdir -p /mnt/c/dev/aws-spotify/docs/postmortem
+cat > /mnt/c/dev/aws-spotify/docs/postmortem/INC-001-s3-public-exposure.md << 'EOF'
+# Incident Report: SPOTIFY-INC-001
+
+## S3 Bucket Public Access Configuration Removed
+
+| Field | Details |
+|-------|---------|
+| Incident ID | SPOTIFY-INC-001 |
+| Severity | P1 (Critical) |
+| Status | Resolved |
+| Duration | 2 hours 15 minutes |
+| Impact | Audio bucket temporarily lost Block Public Access settings |
+| Root Cause | Terraform misconfiguration — resource deleted from .tf file |
+| Date | 2026-03-24 (simulated) |
+
+## Summary
+
+During a routine Terraform update to add CORS configuration to the audio S3 bucket, the `aws_s3_bucket_public_access_block` resource was accidentally removed from the Terraform configuration file. On the next `terraform apply`, Terraform detected the resource was no longer in the desired state and destroyed the corresponding AWS resource. This left the audio bucket without Block Public Access protections for approximately 2 hours.
+
+## Timeline (UTC)
+
+| Time | Event |
+|------|-------|
+| 14:00 | Engineer pushes Terraform change to modify CORS settings on audio bucket |
+| 14:02 | `terraform apply` runs — plan shows 1 create (CORS), 1 destroy (public access block). Engineer approves without reading the destroy line. |
+| 14:02 | `aws_s3_bucket_public_access_block.audio` is destroyed in AWS |
+| 14:05 | AWS Config rule `s3-bucket-server-side-encryption-enabled` evaluates — COMPLIANT (encryption is separate from public access) |
+| 14:15 | GuardDuty detects unusual S3:GetObject patterns from IP addresses outside the AWS account |
+| 14:30 | CloudTrail log shows `DeletePublicAccessBlock` API call by the Terraform IAM role |
+| 14:45 | Alert reaches on-call engineer via SNS email notification |
+| 15:00 | Engineer reviews Terraform state, identifies the missing resource, re-adds it to the .tf file |
+| 15:05 | `terraform apply` restores Block Public Access on the audio bucket |
+| 16:15 | Incident review completed, preventive measures documented |
+
+## Root Cause Analysis
+
+This is NOT a Terraform bug. Terraform did exactly what it was told — the resource was removed from the configuration, so Terraform removed it from AWS to match the desired state. This is correct infrastructure-as-code behavior.
+
+The root cause is a **process failure** at two levels:
+
+1. **No peer review of the Terraform plan.** The `terraform plan` output clearly showed `aws_s3_bucket_public_access_block.audio will be destroyed` in red text. The engineer approved without reading it.
+
+2. **No automated plan validation in CI/CD.** There was no GitHub Actions check that would flag destructive changes to security-critical resources.
+
+### Why the impact was limited
+
+Defense-in-depth controls limited the blast radius:
+
+- The S3 bucket policy with `DenyInsecureTransport` was still in place — blocking HTTP access
+- The bucket had no public ACLs — removing Block Public Access doesn't grant public access, it only removes the guardrail that prevents it
+- Presigned URLs are still required to access objects — no anonymous read was possible
+- GuardDuty detected the anomalous access pattern within 15 minutes
+
+## Actual Data Exposure
+
+**None.** Removing Block Public Access is a necessary but not sufficient condition for public exposure. The bucket policy and lack of public ACLs meant objects remained private. However, the window of vulnerability was real — a single bucket policy misconfiguration during this period could have exposed all audio files.
+
+## Remediation Actions
+
+### Immediate (completed during incident)
+
+1. Re-added `aws_s3_bucket_public_access_block.audio` to Terraform config
+2. Ran `terraform apply` to restore the resource
+3. Verified Block Public Access settings via console
+
+### Short-term (completed within 48 hours)
+
+1. Added `lifecycle { prevent_destroy = true }` to all security-critical Terraform resources:
+   - `aws_s3_bucket_public_access_block.audio`
+   - `aws_s3_bucket_policy.audio`
+   - `aws_s3_bucket_server_side_encryption_configuration.audio`
+
+2. Added AWS Config rule `s3-bucket-level-public-access-prohibited` to detect public access changes
+
+### Long-term (planned)
+
+1. Implement GitHub Actions workflow that runs `terraform plan` on every PR and requires manual approval for any `destroy` actions
+2. Add Open Policy Agent (OPA) or Sentinel policy checks to block plans that destroy security resources
+3. Enable S3 Object Lock on the audio bucket for compliance
+
+## Lessons Learned
+
+| Lesson | Action |
+|--------|--------|
+| Always read the full `terraform plan` output, especially destroy lines | Add to team onboarding documentation |
+| Defense-in-depth works — multiple layers prevented actual exposure | Continue layered security approach |
+| GuardDuty detection was fast (15 min) but notification was slow (30 min) | Reduce SNS alert threshold |
+| `prevent_destroy` lifecycle should be default on security resources | Update Terraform module templates |
+
+## Metrics
+
+- **Time to detect:** 15 minutes (GuardDuty)
+- **Time to notify:** 45 minutes (GuardDuty → CloudTrail correlation → SNS)
+- **Time to remediate:** 20 minutes (identify cause + apply fix)
+- **Total incident duration:** 2 hours 15 minutes
+- **Data exposed:** None
+- **Users impacted:** None
+EOF
+
+mkdir -p /mnt/c/dev/aws-spotify/docs/grc
+cat > /mnt/c/dev/aws-spotify/docs/grc/governance-risk-compliance.md << 'EOF'
+# Governance, Risk, and Compliance — Spotify AWS Project
+
+## 1. Governance Structure
+
+### Change Management
+
+All infrastructure changes follow this process:
+
+1. Engineer creates a feature branch in Git
+2. Terraform configuration changes are committed
+3. `terraform plan` output is reviewed
+4. Pull request is opened for peer review
+5. After approval, `terraform apply` is executed
+6. Changes are verified in the AWS console
+7. Branch is merged to `main`
+
+**Evidence:** Git commit history, Terraform state file versions
+
+### Access Control Matrix
+
+| Role | AWS Console | Terraform Apply | EC2 SSH | S3 Read | S3 Write | IAM Modify |
+|------|------------|----------------|---------|---------|----------|------------|
+| Admin | Full | Yes | Yes | Yes | Yes | Yes |
+| Developer | Read-only (us-east-1) | No | No | Yes | Yes | No |
+| Security Auditor | Read-only (all services) | No | No | Read-only | No | No (explicit deny) |
+| DevOps | Limited | Yes | Yes | Yes | Yes | No |
+| Read-Only | Read-only | No | No | No | No | No |
+
+### Audit Trail
+
+| System | What It Captures | Retention |
+|--------|-----------------|-----------|
+| CloudTrail | Every AWS API call (who, what, when, from where) | 90 days (default) |
+| VPC Flow Logs | Network traffic metadata (source, destination, port, action) | 30 days |
+| CloudWatch Logs | Application logs, error traces | 30 days |
+| Git History | All code and configuration changes | Permanent |
+| Terraform State | Infrastructure resource mapping | Current + 1 backup |
+
+## 2. Risk Assessment
+
+### Risk Matrix
+
+| ID | Risk | Likelihood | Impact | Risk Score | Mitigation | Residual Risk |
+|----|------|-----------|--------|------------|------------|---------------|
+| R1 | S3 bucket public exposure | Low | Critical | High | Block Public Access, bucket policy, Config rules, GuardDuty | Low |
+| R2 | EC2 instance compromise via SSH | Medium | High | High | Ed25519 keys, SG restricted to single IP, fail2ban (planned) | Medium |
+| R3 | Database credential leak | Low | High | Medium | Secrets Manager (planned), no plaintext in code, .gitignore | Low |
+| R4 | Cost overrun beyond budget | Medium | Low | Low | Budget alarms at $8/$10/$15/$20, auto-notification | Low |
+| R5 | IAM privilege escalation | Low | Critical | Medium | Permission boundaries, explicit deny policies, Access Analyzer | Low |
+| R6 | Unpatched OS vulnerabilities | Medium | High | High | Regular dnf update, Amazon Linux 2023 auto-patching | Medium |
+| R7 | CloudTrail log tampering | Low | High | Medium | Log file validation enabled, S3 versioning on log bucket | Low |
+| R8 | JWT token theft | Medium | Medium | Medium | Short token expiry (1hr), HTTPS enforced, HttpOnly cookies (planned) | Medium |
+
+### Risk Acceptance
+
+Risks accepted due to budget constraints (documented for interview discussion):
+
+- **No Multi-AZ deployment:** Single AZ means an AZ outage takes down the entire application. Accepted because this is a portfolio project, not production. Cost of Multi-AZ: ~$15/mo additional.
+- **No WAF on CloudFront:** AWS WAF costs $5/mo base + $1/rule/mo. Accepted due to budget. Would implement for production.
+- **Self-hosted PostgreSQL:** No automated backups, no failover. Accepted because data is reproducible (seed script). Would use RDS for production.
+
+## 3. Compliance Mapping
+
+### NIST 800-53 Controls
+
+| Control ID | Control Name | Implementation | Status |
+|-----------|-------------|---------------|--------|
+| AC-2 | Account Management | IAM users managed via groups, no shared accounts | Implemented |
+| AC-3 | Access Enforcement | IAM policies with resource-level ARN scoping | Implemented |
+| AC-6 | Least Privilege | Custom policies, no wildcards on sensitive actions | Implemented |
+| AC-6(1) | Authorize Access to Security Functions | Permission boundaries cap maximum privileges | Implemented |
+| AC-17 | Remote Access | SSH restricted to single IP, ed25519 keys only | Implemented |
+| AU-2 | Audit Events | CloudTrail captures all API calls | Implemented |
+| AU-3 | Content of Audit Records | CloudTrail records who, what, when, source IP, user agent | Implemented |
+| AU-6 | Audit Review | GuardDuty automated analysis, manual CloudTrail review | Partial |
+| AU-9 | Protection of Audit Info | CloudTrail log validation, S3 versioning | Implemented |
+| CA-7 | Continuous Monitoring | AWS Config rules, GuardDuty, CloudWatch alarms | Implemented |
+| CM-2 | Baseline Configuration | Terraform defines the baseline, drift detectable via plan | Implemented |
+| IA-2 | Identification and Authentication | Cognito for users, IAM for infrastructure | Implemented |
+| IA-2(1) | MFA for Privileged Accounts | MFA on root and admin IAM user | Implemented |
+| IA-5 | Authenticator Management | 12-char password policy, MFA optional, JWT rotation | Implemented |
+| SC-7 | Boundary Protection | VPC with security groups, public/private subnet design | Implemented |
+| SC-8 | Transmission Confidentiality | TLS 1.2+ on CloudFront, HTTPS enforced | Implemented |
+| SC-28 | Protection of Information at Rest | SSE-S3 on audio bucket, encrypted EBS volume | Implemented |
+| SI-4 | Information System Monitoring | CloudWatch metrics/alarms, GuardDuty threat detection | Implemented |
+
+### CIS AWS Foundations Benchmark v3.0
+
+| Control | Description | Status |
+|---------|------------|--------|
+| 1.4 | Ensure no root access key exists | Compliant |
+| 1.5 | Ensure MFA is enabled for root | Compliant |
+| 1.10 | Ensure MFA is enabled for IAM users with console access | Compliant |
+| 2.1.1 | Ensure CloudTrail is enabled in all regions | Compliant |
+| 2.1.2 | Ensure CloudTrail log file validation is enabled | Compliant |
+| 2.2.1 | Ensure GuardDuty is enabled | Compliant |
+| 3.1 | Ensure S3 bucket Block Public Access is enabled | Compliant |
+| 3.3 | Ensure S3 bucket server-side encryption is enabled | Compliant |
+| 5.1 | Ensure no security groups allow ingress on port 22 from 0.0.0.0/0 | Compliant (restricted to admin IP) |
+
+## 4. Security Controls Summary
+
+### Preventive Controls (stop bad things from happening)
+
+- IAM policies with least privilege
+- Permission boundaries as ceilings
+- S3 Block Public Access
+- Security groups restricting network access
+- Encryption at rest and in transit
+
+### Detective Controls (find bad things that happened)
+
+- CloudTrail API logging
+- GuardDuty threat detection
+- AWS Config compliance rules
+- CloudWatch alarms (billing + CPU)
+- IAM Access Analyzer
+
+### Corrective Controls (fix bad things)
+
+- Terraform `prevent_destroy` on security resources
+- Incident response process (documented in postmortem)
+- Budget alarms with escalation thresholds
+EOF
+
+git add -A
+git commit -m "docs: CloudFormation templates, postmortem simulation, GRC documentation
+
+- 2 CloudFormation templates (VPC, S3) as supplementary IaC examples
+- CF vs Terraform comparison README
+- Simulated incident report: S3 public access misconfiguration
+- Full GRC doc: governance, risk matrix, NIST 800-53 and CIS mappings
+- AWS Config rules for compliance monitoring"
+git push origin main
+git push
+history -a ~/wsl-history-full.txt

@@ -13,6 +13,7 @@ The project root. Contains top-level config files and all project subdirectories
 | `.gitignore` | Defines files excluded from git (SSH keys, .env, node_modules, Terraform state/vars) |
 | `LICENSE` | Project license |
 | `README.md` | Project overview and documentation |
+| `CLAUDE.md` | Context file for Claude Code — project onboarding, conventions, rules |
 | `debugging-log.txt` | Running log of all debugging actions, problems, solutions, and lessons learned |
 | `wsl-history-full.txt` | Full WSL command history export — raw input/output reference |
 | `directory.md` | This file. Navigation map of the entire project structure |
@@ -56,34 +57,49 @@ The project root. Contains top-level config files and all project subdirectories
 
 ## `cloudformation/`
 **Location:** `/mnt/c/dev/aws-spotify/cloudformation/`
-**What:** AWS CloudFormation templates (alternative IaC).
-**Why:** Placeholder for CloudFormation-based infrastructure definitions as an alternative or supplement to Terraform.
-**Contains:** Empty — infrastructure is currently managed via Terraform.
-**How to use:** Add `.yaml` or `.json` CloudFormation templates here if migrating from or supplementing Terraform.
+**What:** AWS CloudFormation templates — supplementary IaC examples (NOT deployed).
+**Why:** Demonstrates the same infrastructure in CloudFormation for comparison with the Terraform modules. Shows proficiency in both IaC tools.
+**Contains:**
+- `vpc-networking.yaml` — VPC, subnet, IGW, route table, security group (mirrors terraform/modules/vpc/)
+- `s3-security.yaml` — Audio S3 bucket with encryption, versioning, lifecycle, CORS, bucket policy (mirrors terraform/modules/s3/)
+- `README.md` — Terraform vs CloudFormation comparison, validation/deployment instructions
+**How to use:** Validate without deploying: `aws cloudformation validate-template --template-body file://vpc-networking.yaml`. These are reference only — Terraform manages the live infrastructure.
 
 ---
 
 ## `docs/`
 **Location:** `/mnt/c/dev/aws-spotify/docs/`
-**What:** Project documentation, architecture diagrams, incident reports.
-**Why:** Central location for non-code documentation that supports operations and development.
+**What:** Project documentation, architecture diagrams, incident reports, compliance docs.
+**Why:** Central location for non-code documentation that supports operations, security, and development.
 **Contains:**
 - `diagrams/` — Architecture and flow diagrams (empty)
-- `postmortem/` — Incident post-mortem reports (empty)
+- `grc/governance-risk-compliance.md` — Governance structure, risk matrix, NIST 800-53 controls, CIS AWS Foundations mapping, security controls summary
+- `postmortem/INC-001-s3-public-exposure.md` — Simulated incident report: S3 public access misconfiguration (timeline, root cause analysis, remediation, lessons learned)
 - `runbook/AWS_Spotify_Runbook.pdf` — Operational runbook for the AWS infrastructure
-**How to use:** Reference the runbook for operational procedures. Add architecture diagrams to `diagrams/` and incident reports to `postmortem/` as they arise.
+**How to use:** Reference the runbook for operational procedures. GRC doc covers compliance mappings for interview discussion. Postmortem follows standard incident response format.
 
 ---
 
 ## `frontend/`
 **Location:** `/mnt/c/dev/aws-spotify/frontend/`
-**What:** React frontend application (SPA).
-**Why:** The user-facing web app — music player UI, search, playlists, authentication.
+**What:** React frontend application (SPA) built with Vite.
+**Why:** The user-facing web app — music player UI with search, song listing, and audio playback.
 **Contains:**
-- `public/` — Static assets (index.html, favicon, etc.)
-- `src/` — React components, pages, hooks, and styles
-**How to use:** Run locally with `npm start` (port 3000). Build for production with `npm run build`. Deployed to the S3 frontend bucket and served via CloudFront.
-**Note:** Source files are currently empty — frontend development not yet started.
+- `index.html` — Entry HTML file
+- `vite.config.js` — Vite build configuration
+- `package.json` — Dependencies (react, react-dom, vite)
+- `src/main.jsx` — React entry point
+- `src/App.jsx` — Main app component (search bar, song list, audio player, API health check)
+- `public/` — Static assets
+- `dist/` — Build output (deployed to S3)
+**How to use:**
+```bash
+cd /mnt/c/dev/aws-spotify/frontend
+npm run dev      # Local dev server
+npm run build    # Build for production
+aws s3 sync dist/ s3://spotify-frontend-037336516853/ --delete   # Deploy to S3
+```
+**Deployed at:** CloudFront distribution URL (via `terraform output cloudfront_url`)
 
 ---
 
@@ -165,7 +181,7 @@ Reusable Terraform modules. Each module is self-contained with its own variables
 #### `terraform/modules/vpc/`
 **Location:** `/mnt/c/dev/aws-spotify/terraform/modules/vpc/`
 **What:** Virtual Private Cloud networking.
-**Contains:** `main.tf` — VPC (10.0.0.0/16), internet gateway, public subnet (10.0.1.0/24 in us-east-1a), route table, security group with ingress rules (SSH from admin IP, HTTP/HTTPS from anywhere, PostgreSQL from VPC only), all outbound egress.
+**Contains:** `main.tf` — VPC (10.0.0.0/16), internet gateway, public subnet (10.0.1.0/24 in us-east-1a), route table, security group with ingress rules (SSH from admin IP, HTTP/HTTPS from anywhere, port 3000 API server, PostgreSQL from VPC only), all outbound egress.
 **Variables:** vpc_cidr, public_subnet_cidr, availability_zone, project_name, admin_ip
 **Outputs:** vpc_id, public_subnet_id, api_security_group_id
 
@@ -238,6 +254,7 @@ Reusable Terraform modules. Each module is self-contained with its own variables
 | IAM Role | SpotifyEC2Role + SpotifyEC2Profile | AWS CLI |
 | CloudTrail | spotify-audit-trail | AWS CLI |
 | GuardDuty | Detector (15-min publishing) | AWS CLI |
+| AWS Config | 4 compliance rules (S3 encryption, EC2 in VPC, root MFA, root access key) | AWS CLI |
 | S3 | spotify-cloudtrail-037336516853 | AWS CLI |
 
 ---
