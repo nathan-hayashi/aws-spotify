@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Spotify Project - S3 Buckets with Security Controls (CloudFormation supplementary example)'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spotify
+
+Resources:
+  AudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-audio-${AWS::AccountId}-cf'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: move-old-versions-to-ia
+            Status: Enabled
+            NoncurrentVersionTransition:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, HEAD]
+            AllowedOrigins:
+              - 'https://*.cloudfront.net'
+              - 'http://localhost:3000'
+            ExposedHeaders:
+              - Content-Length
+              - Content-Range
+              - Accept-Ranges
+            MaxAge: 3600
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-audio'
+        - Key: ManagedBy
+          Value: cloudformation
+
+  AudioBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AudioBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyUnencryptedUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub '${AudioBucket.Arn}/*'
+            Condition:
+              StringNotEquals:
+                s3:x-amz-server-side-encryption: AES256
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt AudioBucket.Arn
+              - !Sub '${AudioBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+Outputs:
+  AudioBucketName:
+    Value: !Ref AudioBucket
+    Export:
+      Name: !Sub '${ProjectName}-AudioBucketName'
+  AudioBucketArn:
+    Value: !GetAtt AudioBucket.Arn
+    Export:
+      Name: !Sub '${ProjectName}-AudioBucketArn'
