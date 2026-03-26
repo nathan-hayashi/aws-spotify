@@ -1,26 +1,5 @@
----
-title: "AWS Spotify Project — Portfolio Proof of Work"
-subtitle: "Complete Build Log, Debugging Journal, and Evidence Map"
-author: "Nathan Lim"
-date: "March 2026"
-geometry: "margin=1in"
-fontsize: 11pt
-mainfont: "DejaVu Sans"
-monofont: "DejaVu Sans Mono"
-linkcolor: blue
-urlcolor: blue
-toc: true
-toc-depth: 3
-numbersections: true
-header-includes:
-  - \usepackage{fancyhdr}
-  - \pagestyle{fancy}
-  - \fancyhead[L]{AWS Spotify — Proof of Work}
-  - \fancyhead[R]{Nathan Lim}
-  - \fancyfoot[C]{\thepage}
----
-
-\newpage
+# AWS Spotify Project -- Portfolio Proof of Work
+**Author:** Nathan Lim | **Date:** March 2026
 
 # Project Summary
 
@@ -62,18 +41,16 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 
 | Resource | Identifier | Region |
 |----------|-----------|--------|
-| VPC | vpc-00735e60db61b77ca | us-east-1 |
-| Subnet | subnet-0d8044e9a91c9f080 | us-east-1a |
-| Security Group | sg-0b9bd49198b4d1135 | us-east-1 |
-| EC2 Instance | i-0c94b3606f81af2f1 | us-east-1 |
-| Elastic IP | eipalloc-08d5d9dd38ba9ccad (34.195.227.70) | us-east-1 |
-| S3 Audio | spotify-audio-037336516853 | us-east-1 |
-| S3 Frontend | spotify-frontend-037336516853 | us-east-1 |
-| CloudFront | E2LBAGJGWV1RLK (d24l2jal5wti3z.cloudfront.net) | Global |
+| VPC | vpc-<REDACTED> | us-east-1 |
+| Subnet | subnet-<REDACTED> | us-east-1a |
+| Security Group | sg-<REDACTED> | us-east-1 |
+| EC2 Instance | i-<REDACTED> | us-east-1 |
+| Elastic IP | eipalloc-<REDACTED> (<EC2_IP>) | us-east-1 |
+| S3 Audio | spotify-audio-<ACCOUNT_ID> | us-east-1 |
+| S3 Frontend | spotify-frontend-<ACCOUNT_ID> | us-east-1 |
+| CloudFront | <DISTRIBUTION_ID> (<CLOUDFRONT_DOMAIN>) | Global |
 | Cognito User Pool | us-east-1_xxxxx | us-east-1 |
 | CloudTrail | spotify-audit-trail | Multi-region |
-
-\newpage
 
 # Build Timeline — Phase-by-Phase Action Log
 
@@ -113,7 +90,7 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 ### Actions Taken
 
 1. **AWS CLI configured** with `spotify-admin` profile, us-east-1 region
-2. **Verified identity** — `aws sts get-caller-identity` returned account 037336516853
+2. **Verified identity** — `aws sts get-caller-identity` returned account <ACCOUNT_ID>
 3. **Created 5 IAM groups** via CLI:
    - SpotifyAdmins, SpotifyDevelopers, SpotifyDevOps, SpotifySecurityAuditors, SpotifyReadOnly
 4. **Created 3 custom IAM policies** as JSON files in `iam-policies/`:
@@ -146,7 +123,7 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 
 ### Actions Taken
 
-1. **Created CloudTrail S3 bucket** — `spotify-cloudtrail-037336516853`
+1. **Created CloudTrail S3 bucket** — `spotify-cloudtrail-<ACCOUNT_ID>`
 2. **Applied bucket policy** granting CloudTrail write access
 3. **Created CloudTrail trail** — multi-region, log file validation enabled
 4. **Started CloudTrail logging** — verified with `get-trail-status` (IsLogging: true)
@@ -266,7 +243,7 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 
 ### Debugging During This Phase
 
-**Issue #16: Bash History Expansion** — Password `SpotifyDev2026!` in a heredoc caused bash to expand `!` as history reference. Used single quotes or files instead.
+**Issue #16: Bash History Expansion** — Password `<REDACTED>` in a heredoc caused bash to expand `!` as history reference. Used single quotes or files instead.
 
 **Issue #17: citext Extension Missing** — `postgresql16-contrib` package required separately from base install.
 
@@ -281,7 +258,7 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 ### Evidence
 
 - WSL history lines 2780-3340
-- API running at `http://34.195.227.70:3000/api/health`
+- API running at `http://<EC2_IP>:3000/api/health`
 - debugging-log.txt entries 16-21
 
 ## Phase 6: Frontend and Documentation
@@ -300,7 +277,7 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 
 2. **Deployed to S3:**
    - `npm run build` produced `dist/` directory
-   - `aws s3 sync dist/ s3://spotify-frontend-037336516853/ --delete`
+   - `aws s3 sync dist/ s3://spotify-frontend-<ACCOUNT_ID>/ --delete`
 
 3. **Port fix:**
    - API originally on port 80 (failed — requires root, ec2-user doesn't have it)
@@ -335,10 +312,8 @@ A microscaled Spotify-inspired architecture deployed on AWS, including:
 ### Evidence
 
 - WSL history lines 3004-3929
-- CloudFront URL: `https://d24l2jal5wti3z.cloudfront.net`
+- CloudFront URL: `https://<CLOUDFRONT_DOMAIN>`
 - debugging-log.txt entries 24-27
-
-\newpage
 
 # Debugging Summary — Recurring Themes
 
@@ -361,8 +336,6 @@ AMI ID prefix, IAM ARN double colons, bash `!` expansion, heredoc markers. Root 
 ## Theme 5: Permissions Model
 
 Permission boundaries vs policies, table ownership vs grants, Linux file permissions on Windows FS, ec2-user vs postgres sudo access. Root cause: Multiple layered permission systems.
-
-\newpage
 
 # Terraform State — Full Resource Inventory
 
@@ -406,8 +379,6 @@ module.cognito.aws_cognito_user_pool_client.frontend
 module.cognito.aws_cognito_user_pool_client.api
 ```
 
-\newpage
-
 # Git Commit History
 
 ```
@@ -425,8 +396,6 @@ module.cognito.aws_cognito_user_pool_client.api
 
 5. Additional commits for CLAUDE.md, directory.md, debugging-log.txt
 ```
-
-\newpage
 
 # AWS Console Screenshot Guide
 
@@ -456,7 +425,7 @@ This section maps exactly what to screenshot in the AWS console, which code prod
 
 | # | What to Screenshot | Where in AWS Console | Code That Created It |
 |---|-------------------|---------------------|---------------------|
-| 11 | Audio bucket overview | S3 > spotify-audio-037336516853 | `terraform/modules/s3/main.tf` |
+| 11 | Audio bucket overview | S3 > spotify-audio-<ACCOUNT_ID> | `terraform/modules/s3/main.tf` |
 | 12 | Audio bucket versioning enabled | S3 > spotify-audio > Properties > Bucket Versioning | `terraform/modules/s3/main.tf` aws_s3_bucket_versioning |
 | 13 | Audio bucket encryption (SSE-S3 AES-256) | S3 > spotify-audio > Properties > Default encryption | `terraform/modules/s3/main.tf` aws_s3_bucket_server_side_encryption_configuration |
 | 14 | Audio bucket Block Public Access (all 4 enabled) | S3 > spotify-audio > Permissions > Block public access | `terraform/modules/s3/main.tf` aws_s3_bucket_public_access_block |
@@ -470,7 +439,7 @@ This section maps exactly what to screenshot in the AWS console, which code prod
 
 | # | What to Screenshot | Where in AWS Console | Code That Created It |
 |---|-------------------|---------------------|---------------------|
-| 20 | Distribution overview (domain, status, price class) | CloudFront > Distributions > E2LBAGJGWV1RLK | `terraform/modules/cloudfront/main.tf` |
+| 20 | Distribution overview (domain, status, price class) | CloudFront > Distributions > <DISTRIBUTION_ID> | `terraform/modules/cloudfront/main.tf` |
 | 21 | Origins tab (S3 frontend + EC2 API) | CloudFront > Distribution > Origins tab | `terraform/modules/cloudfront/main.tf` origin blocks |
 | 22 | Behaviors tab (default S3 + /api/* to EC2) | CloudFront > Distribution > Behaviors tab | `terraform/modules/cloudfront/main.tf` cache behaviors |
 | 23 | Error pages (403/404 to index.html) | CloudFront > Distribution > Error pages tab | `terraform/modules/cloudfront/main.tf` custom_error_response |
@@ -511,7 +480,7 @@ This section maps exactly what to screenshot in the AWS console, which code prod
 
 | # | What to Screenshot | Where in Browser | Code That Created It |
 |---|-------------------|-----------------|---------------------|
-| 41 | Full page showing all 28 songs | `https://d24l2jal5wti3z.cloudfront.net` | `frontend/src/App.jsx` |
+| 41 | Full page showing all 28 songs | `https://<CLOUDFRONT_DOMAIN>` | `frontend/src/App.jsx` |
 | 42 | Search results for "red" | Search bar with "red" typed | `frontend/src/App.jsx` search function |
 | 43 | Song highlighted as playing | Click any song row | `frontend/src/App.jsx` playSong function |
 | 44 | API health badge showing "API Connected" | Top-right corner of the page | `frontend/src/App.jsx` health check useEffect |
@@ -520,10 +489,10 @@ This section maps exactly what to screenshot in the AWS console, which code prod
 
 | # | What to Screenshot | Command | Code That Created It |
 |---|-------------------|---------|---------------------|
-| 45 | Health check JSON | `curl http://34.195.227.70:3000/api/health \| jq` | EC2: `/opt/spotify-api/server.js` health endpoint |
-| 46 | Song list JSON (all 28) | `curl http://34.195.227.70:3000/api/songs \| jq` | EC2: `/opt/spotify-api/src/routes/songs.js` |
-| 47 | Single song with presigned URL | `curl http://34.195.227.70:3000/api/songs/1 \| jq` | EC2: `/opt/spotify-api/src/routes/songs.js` + `src/services/s3.js` |
-| 48 | Search results JSON | `curl "http://34.195.227.70:3000/api/search?q=red" \| jq` | EC2: `/opt/spotify-api/src/routes/search.js` |
+| 45 | Health check JSON | `curl http://<EC2_IP>:3000/api/health \| jq` | EC2: `/opt/spotify-api/server.js` health endpoint |
+| 46 | Song list JSON (all 28) | `curl http://<EC2_IP>:3000/api/songs \| jq` | EC2: `/opt/spotify-api/src/routes/songs.js` |
+| 47 | Single song with presigned URL | `curl http://<EC2_IP>:3000/api/songs/1 \| jq` | EC2: `/opt/spotify-api/src/routes/songs.js` + `src/services/s3.js` |
+| 48 | Search results JSON | `curl "http://<EC2_IP>:3000/api/search?q=red" \| jq` | EC2: `/opt/spotify-api/src/routes/search.js` |
 
 ## Terraform
 
@@ -533,8 +502,6 @@ This section maps exactly what to screenshot in the AWS console, which code prod
 | 50 | `terraform plan` showing "No changes" (clean state) | `terraform plan` | All modules |
 
 **Total screenshots: 50**
-
-\newpage
 
 # File Reference — Where Everything Lives
 

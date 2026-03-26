@@ -1,32 +1,7 @@
----
-title: "AWS Spotify Project — Complete Runbook"
-subtitle: "Microscaled Spotify Architecture on AWS with Terraform, IAM, and Security Deep Dive"
-author: "Nathan Lim — IAM & Cloud Security Portfolio Project"
-date: "March 2026 — Updated v2"
-geometry: "margin=1in"
-fontsize: 11pt
-mainfont: "DejaVu Sans"
-monofont: "DejaVu Sans Mono"
-linkcolor: blue
-urlcolor: blue
-toccolor: black
-toc: true
-toc-depth: 3
-numbersections: true
-header-includes:
-  - \usepackage{fancyhdr}
-  - \pagestyle{fancy}
-  - \fancyhead[L]{AWS Spotify Runbook}
-  - \fancyhead[R]{Nathan Lim}
-  - \fancyfoot[C]{\thepage}
-  - \usepackage{awesomebox}
-  - \usepackage{xcolor}
-  - \definecolor{codebg}{HTML}{F5F5F5}
-  - \definecolor{warnbg}{HTML}{FFF3CD}
-  - \definecolor{infobg}{HTML}{D1ECF1}
----
+# AWS Spotify Project -- Complete Runbook
+**Microscaled Spotify Architecture on AWS with Terraform, IAM, and Security Deep Dive**
+**Author:** Nathan Lim | **Updated:** March 2026
 
-\newpage
 
 # Project Overview
 
@@ -48,7 +23,7 @@ The project is NOT a full Spotify clone. It is a focused cloud infrastructure an
 
 ## Architecture Decisions — The "Why" Behind Every Choice
 
-Every architectural decision in this project has a root cause. This section documents the reasoning so you can articulate it in interviews.
+Every architectural decision in this project has a root cause. This section documents the reasoning behind each choice.
 
 ### Compute: EC2 t3.micro ($7.59/mo on-demand in us-east-1)
 
@@ -64,8 +39,6 @@ Every architectural decision in this project has a root cause. This section docu
 - Lambda was rejected because it architecturally diverges from Spotify's always-on server model and doesn't demonstrate VPC networking, security groups, or SSH hardening — all critical for an IAM/security portfolio
 - ECS Fargate was rejected because the ALB/NLB requirement alone costs $16+/month, exceeding the $10 budget before compute even starts
 
-**Interview talking point:** "I chose EC2 over serverless specifically because the security surface area is richer — I wanted to demonstrate security group configuration, SSH key management, OS-level hardening, and VPC subnet placement. In production, I'd move to ECS Fargate behind an ALB for horizontal scaling, and I've written the Terraform modules to support that upgrade path."
-
 ### Database: PostgreSQL Self-Hosted on EC2 ($0 incremental)
 
 **What Spotify actually uses:** Spotify uses PostgreSQL heavily for metadata storage, along with Cassandra for high-throughput data and BigTable on GCP for analytics.
@@ -78,8 +51,6 @@ Every architectural decision in this project has a root cause. This section docu
 - Self-hosting PostgreSQL on the same EC2 instance costs $0 incremental — we're already paying for the compute
 - The database schema (users, songs, artists, playlists, playlistitems, artistsongs) uses PostgreSQL-native types: `bigint`, `citext`, `timestamptz` — matching Spotify's actual production stack
 - Self-hosting forces you to understand backup strategies, connection pooling, and OS-level database security — all topics enterprise environments deal with
-
-**What breaks if you skip this reasoning:** If an interviewer asks "why not RDS?", saying "it was too expensive" sounds like a limitation. Saying "I deliberately chose self-hosted to demonstrate that I understand the operational tradeoffs — automated backups vs. manual pg_dump, Multi-AZ failover vs. single-instance risk, and the exact cost threshold ($12.41/mo for db.t3.micro) where RDS becomes justified" sounds like an architect.
 
 ### Storage: S3 for Audio Files
 
@@ -151,52 +122,11 @@ The following values are the exact design targets from the Brain Dump documentat
 
 This is the adapted version of the Lucidchart diagram from the Brain Dump, scaled down from the 3-server production vision to the microscale single-instance deployment:
 
-```
-                    ┌──────────────────────────────────────────────────────┐
-                    │                   AWS Cloud (us-east-1)              │
-                    │                                                      │
-  ┌─────────┐      │  ┌──────────────┐     ┌──────────────────────────┐   │
-  │  Static  │──────┼─>│  CloudFront  │────>│    S3 Bucket (Frontend)  │   │
-  │  React   │      │  │  (CDN/HTTPS) │     │    React SPA assets      │   │
-  │  Client  │      │  └──────┬───────┘     └──────────────────────────┘   │
-  └─────────┘      │         │                                             │
-       │           │         │ API requests                                │
-       │           │         v                                             │
-       │           │  ┌──────────────────────────────────────────────┐     │
-       │           │  │           VPC (10.0.0.0/16)                  │     │
-       │           │  │                                              │     │
-       │           │  │  ┌─────────────────────────────────────┐    │     │
-       │           │  │  │     Public Subnet (10.0.1.0/24)     │    │     │
-       │           │  │  │                                     │    │     │
-       │           │  │  │  ┌────────────────────────────┐    │    │     │
-       └──────────────┼──┼─>│  EC2 t3.micro              │    │    │     │
-                    │  │  │  │  - Node.js API Server      │    │    │     │
-                    │  │  │  │  - PostgreSQL 16            │    │    │     │
-                    │  │  │  │  - JWT Validation           │    │    │     │
-                    │  │  │  └─────────┬──────────────────┘    │    │     │
-                    │  │  │            │                        │    │     │
-                    │  │  └────────────┼────────────────────────┘    │     │
-                    │  │               │                              │     │
-                    │  └───────────────┼──────────────────────────────┘     │
-                    │                  │ Generate Presigned URLs            │
-                    │                  v                                    │
-                    │  ┌──────────────────────────────────────────────┐     │
-                    │  │     S3 Bucket (Audio Files)                  │     │
-                    │  │     /artist/{id}/album/{id}/{song}.ogg      │     │
-                    │  │     SSE-S3 Encryption, Versioning           │     │
-                    │  └──────────────────────────────────────────────┘     │
-                    │                                                      │
-                    │  ┌──────────────────────────────────────────────┐     │
-                    │  │     Cognito User Pool                       │     │
-                    │  │     - User sign-up/sign-in                  │     │
-                    │  │     - MFA enforcement                       │     │
-                    │  │     - JWT token issuance                    │     │
-                    │  └──────────────────────────────────────────────┘     │
-                    │                                                      │
-                    └──────────────────────────────────────────────────────┘
-```
+![Architecture Overview](../diagrams/architecture-overview.svg)
 
 ### Data Flow: User Plays a Song
+
+![Data Flow - Playing a Song](../diagrams/data-flow-play-song.svg)
 
 This maps directly to the User System Workflow diagram from the Brain Dump:
 
@@ -226,293 +156,19 @@ This maps to the Artist System Workflow diagram:
 9. Invalidate CloudFront cache for the artist/album path
 10. Return 201 Created with song metadata
 
-\newpage
 
-# Environment Setup (Windows 11)
-
-## Prerequisites Checklist
-
-Before starting, you need these accounts and tools. Each item has a root cause explanation for why it's required.
-
-### Accounts Required
-
-| Account | Why | Cost |
-|---------|-----|------|
-| AWS Account | Cloud infrastructure host | Pay-as-you-go (target: $8-10/mo) |
-| GitHub Account | Version control, CI/CD pipeline home, portfolio visibility | Free |
-| Spotify Developer Account | API reference documentation, OAuth flow reference | Free |
-
-### Tools Installation Order
-
-The order matters. Dependencies flow downward — each tool may require the one above it.
-
-## Step 1: Install Git for Windows
-
-**Root cause:** Git is the version control system. Every file in this project — Terraform configs, application code, documentation — lives in a Git repository. Without it, you cannot push code to GitHub, collaborate, or maintain history.
-
-1. Download Git from `https://git-scm.com/download/win`
-2. Run the installer with these specific settings:
-   - **Default editor:** Select "Use Visual Studio Code as Git's default editor"
-   - **PATH environment:** Select "Git from the command line and also from 3rd-party software"
-   - **HTTPS transport:** Select "Use the OpenSSL library"
-   - **Line ending conversions:** Select "Checkout Windows-style, commit Unix-style line endings" (this prevents CRLF issues in Terraform files deployed to Linux EC2)
-   - **Terminal emulator:** Select "Use Windows' default console window"
-   - **Default branch name:** Select "Override the default branch name" and type `main`
-
-3. Verify installation:
-
-```powershell
-git --version
-# Expected: git version 2.47.x or later
-```
-
-4. Configure your identity (required before any commits):
-
-```powershell
-git config --global user.name "Nathan Lim"
-git config --global user.email "your-github-email@example.com"
-git config --global init.defaultBranch main
-```
-
-## Step 2: Create the GitHub Repository
-
-**Root cause:** The repository is both your version control backend and your portfolio artifact. Recruiters and hiring managers will look at this repo. Structure matters.
-
-1. Go to `https://github.com/new`
-2. Repository name: `aws-spotify`
-3. Description: "Microscaled Spotify architecture on AWS — IAM, Terraform, and Cloud Security portfolio project"
-4. Visibility: **Public** (this is a portfolio piece)
-5. Check "Add a README file"
-6. Add `.gitignore`: Select "Terraform" from the template dropdown
-7. License: MIT
-
-3. Clone locally:
-
-```powershell
-cd C:\Users\YourUsername\Projects
-git clone https://github.com/YOUR_USERNAME/aws-spotify.git
-cd aws-spotify
-```
-
-4. Create the project directory structure:
-
-```powershell
-# Create directory structure
-mkdir -p terraform/modules/vpc
-mkdir -p terraform/modules/ec2
-mkdir -p terraform/modules/s3
-mkdir -p terraform/modules/cloudfront
-mkdir -p terraform/modules/cognito
-mkdir -p terraform/modules/iam
-mkdir -p terraform/modules/monitoring
-mkdir -p terraform/environments/dev
-mkdir -p terraform/environments/prod
-mkdir -p cloudformation
-mkdir -p app/src/routes
-mkdir -p app/src/middleware
-mkdir -p app/src/models
-mkdir -p app/src/services
-mkdir -p app/src/utils
-mkdir -p app/tests
-mkdir -p frontend/src
-mkdir -p frontend/public
-mkdir -p docs/diagrams
-mkdir -p docs/postmortem
-mkdir -p docs/runbook
-mkdir -p scripts
-mkdir -p .github/workflows
-```
-
-**Root cause for this structure:**
-
-- `terraform/modules/` — Reusable Terraform modules, one per AWS service. This mirrors how enterprise teams organize IaC: each module is independently testable, version-controllable, and composable.
-- `terraform/environments/` — Separate variable files for dev vs. prod. Even on a personal project, this demonstrates environment isolation understanding.
-- `cloudformation/` — The 2-3 supplementary CF templates live here for comparison.
-- `app/` — The Node.js API server. Standard MVC-ish structure.
-- `frontend/` — The React SPA. Deployed to S3, not the EC2 instance.
-- `docs/` — Diagrams, postmortem reports, this runbook.
-- `scripts/` — Utility scripts for deployment, database seeding, etc.
-- `.github/workflows/` — GitHub Actions CI/CD (future phase).
-
-## Step 3: Install Visual Studio Code and Extensions
-
-**Root cause:** VSCode is the IDE. The extensions below are not optional — each one provides specific functionality needed for this project.
-
-1. Download and install VSCode from `https://code.visualstudio.com/`
-
-2. Install these extensions (press `Ctrl+Shift+X` to open the Extensions panel):
-
-| Extension | ID | Why |
-|-----------|-----|-----|
-| HashiCorp Terraform | `hashicorp.terraform` | HCL syntax highlighting, autocompletion, `terraform fmt` integration |
-| AWS Toolkit | `amazonwebservices.aws-toolkit-vscode` | AWS resource browsing, CloudFormation linting, credentials management |
-| REST Client | `humao.rest-client` | Test API endpoints directly from `.http` files in VSCode (replaces Postman for quick tests) |
-| PostgreSQL | `cweijan.vscode-postgresql-client2` | Connect to and query your PostgreSQL database from VSCode |
-| GitLens | `eamodio.gitlens` | Enhanced Git history, blame annotations, branch visualization |
-| YAML | `redhat.vscode-yaml` | YAML validation for CloudFormation templates |
-| Prettier | `esbenp.prettier-vscode` | Code formatting for JavaScript/JSON/HTML |
-| ESLint | `dbaeumer.vscode-eslint` | JavaScript/TypeScript linting |
-| Thunder Client | `rangav.vscode-thunder-client` | Full-featured API testing GUI (alternative to Postman) |
-| Remote - SSH | `ms-vscode-remote.remote-ssh` | SSH directly into your EC2 instance from VSCode |
-| Docker | `ms-azuretools.vscode-docker` | If you later containerize the app |
-
-3. Configure VSCode settings for this project. Create `.vscode/settings.json` in your repo:
-
-```json
-{
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "[terraform]": {
-    "editor.defaultFormatter": "hashicorp.terraform",
-    "editor.formatOnSave": true
-  },
-  "[json]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-  "files.associations": {
-    "*.tf": "terraform",
-    "*.tfvars": "terraform"
-  },
-  "terraform.languageServer.enable": true,
-  "terraform.validation.enableEnhancedValidation": true
-}
-```
-
-## Step 4: Install AWS CLI v2
-
-**Root cause:** The AWS CLI is how Terraform and your scripts authenticate to AWS. Without it, nothing deploys.
-
-1. Download the AWS CLI v2 MSI installer from: `https://awscli.amazonaws.com/AWSCLIV2.msi`
-2. Run the installer (default settings are fine)
-3. Verify:
-
-```powershell
-aws --version
-# Expected: aws-cli/2.x.x Python/3.x.x Windows/10 exe/AMD64
-```
-
-4. Configure credentials (we will create the IAM user in Section 3, but the command is):
-
-```powershell
-aws configure
-# AWS Access Key ID: [from IAM user creation]
-# AWS Secret Access Key: [from IAM user creation]
-# Default region name: us-east-1
-# Default output format: json
-```
-
-**Security note:** `aws configure` stores credentials in plaintext at `C:\Users\YourUsername\.aws\credentials`. In Section 3 (IAM), we will set up credential rotation and discuss why enterprise environments use AWS SSO/Identity Center instead.
-
-## Step 5: Install Terraform
-
-**Root cause:** Terraform is the primary infrastructure-as-code tool for this project. All AWS resources (VPC, EC2, S3, CloudFront, Cognito, IAM roles) are defined as Terraform configurations.
-
-The latest stable version as of March 2026 is **Terraform 1.14.7**. Version 1.15.0 is in beta.
-
-**Method 1: winget (recommended for Windows 11)**
-
-```powershell
-winget install HashiCorp.Terraform
-```
-
-**Method 2: Chocolatey**
-
-```powershell
-choco install terraform
-```
-
-**Method 3: Manual installation**
-
-```powershell
-# Download from https://releases.hashicorp.com/terraform/1.14.7/
-# Extract terraform.exe to C:\terraform\
-# Add C:\terraform\ to your system PATH:
-#   System Properties > Environment Variables > System Variables > Path > Edit > New > C:\terraform
-```
-
-Verify:
-
-```powershell
-terraform --version
-# Expected: Terraform v1.14.7
-```
-
-## Step 6: Install Node.js
-
-**Root cause:** The API server is built with Node.js/Express. Node.js is also required for the React frontend build toolchain.
-
-1. Download Node.js LTS from `https://nodejs.org/` (v22.x LTS as of March 2026)
-2. Run the installer, check "Automatically install necessary tools"
-3. Verify:
-
-```powershell
-node --version
-npm --version
-```
-
-## Step 7: Generate SSH Key Pair
-
-**Root cause:** You need an SSH key to securely connect to the EC2 instance. Password-based SSH is disabled by default on Amazon Linux — and should never be enabled. SSH keys use asymmetric cryptography: your private key stays on your machine, the public key goes on the server.
-
-```powershell
-ssh-keygen -t ed25519 -C "aws-spotify-ec2" -f C:\Users\YourUsername\.ssh\aws-spotify-key
-```
-
-**Why ed25519 and not RSA:**
-
-- Ed25519 keys are 256-bit, providing equivalent security to RSA-3072 but with much shorter key lengths
-- Faster signature generation and verification
-- Not vulnerable to timing side-channel attacks that affect some RSA implementations
-- AWS EC2 supports ed25519 key pairs natively
-
-This creates two files:
-- `aws-spotify-key` — your private key (NEVER share this, NEVER commit this)
-- `aws-spotify-key.pub` — your public key (this gets uploaded to AWS)
-
-Add to `.gitignore` immediately:
-
-```
-# SSH keys
-*.pem
-*_key
-*.key
-```
-
-## Step 8: Claude Code Setup
-
-**Root cause:** Claude Code is a CLI tool for AI-assisted code generation. You'll use it to generate boilerplate Terraform configs, API route handlers, and database migration scripts.
-
-Install Claude Code per the latest instructions at `https://docs.claude.com`. Key prompts you'll use throughout this project:
-
-**For Terraform generation:**
-```
-Generate a Terraform module for an AWS VPC with a public subnet in us-east-1.
-Include security group rules for SSH (port 22 from my IP only),
-HTTP (80), HTTPS (443), and PostgreSQL (5432 from VPC CIDR only).
-Use variables for CIDR blocks and tags. Output the VPC ID and subnet ID.
-```
-
-**For API route scaffolding:**
-```
-Generate an Express.js route handler for GET /songs/{id} that:
-1. Validates a JWT token from the Authorization header
-2. Queries PostgreSQL for song metadata by ID
-3. Generates an S3 presigned URL (15-minute expiry) for the audio file
-4. Returns JSON with metadata and presigned URL
-Include error handling for invalid JWT, song not found, and S3 errors.
-```
-
-**For IAM policy generation:**
-```
-Generate an IAM policy JSON document that grants an EC2 instance:
-- Read-only access to a specific S3 bucket (spotify-audio-{account-id})
-- Permission to generate presigned URLs for objects in that bucket
-- Read access to a Secrets Manager secret for database credentials
-- Write access to CloudWatch Logs for application logging
-Follow least-privilege principle. Explain each statement.
-```
-
-\newpage
+## Prerequisites
+
+| Tool | Version Used | Purpose |
+|------|-------------|---------|
+| WSL2 (Ubuntu 24.04) | Kernel 5.15 | Primary CLI environment |
+| Terraform | v1.14.7 | Infrastructure as Code |
+| AWS CLI | v2.x | AWS resource management |
+| Node.js | v22.x LTS | API server runtime |
+| PostgreSQL | 16.x | Database |
+| Git | 2.43.x | Version control |
+
+All commands in this runbook are executed from WSL2. The project root is `/mnt/c/dev/aws-spotify/`.
 
 # AWS Account Hardening and IAM Foundation
 
@@ -833,7 +489,7 @@ aws iam create-policy \
   --policy-document file://terraform/modules/iam/permission-boundary.json
 
 # When creating IAM roles for the project, always include:
-# --permissions-boundary arn:aws:iam::037336516853:policy/SpotifyPermissionBoundary
+# --permissions-boundary arn:aws:iam::<ACCOUNT_ID>:policy/SpotifyPermissionBoundary
 ```
 
 ### IAM Access Analyzer
@@ -848,6 +504,8 @@ aws accessanalyzer create-analyzer \
 ```
 
 ### EC2 Instance Role (Most Important IAM Configuration)
+
+![IAM Trust and Permission Chain](../diagrams/iam-trust-chain.svg)
 
 **Root cause:** The EC2 instance running your API server needs to access S3 (presigned URLs), Secrets Manager (database password), and CloudWatch (logging). Instead of hardcoding AWS access keys on the instance (a critical security anti-pattern), you attach an IAM Instance Profile. The instance assumes the role automatically via the EC2 metadata service. Credentials rotate automatically every ~6 hours.
 
@@ -865,8 +523,8 @@ aws accessanalyzer create-analyzer \
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::spotify-audio-037336516853",
-        "arn:aws:s3:::spotify-audio-037336516853/*"
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>",
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>/*"
       ]
     },
     {
@@ -875,7 +533,7 @@ aws accessanalyzer create-analyzer \
       "Action": [
         "s3:GetObject"
       ],
-      "Resource": "arn:aws:s3:::spotify-audio-037336516853/*"
+      "Resource": "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>/*"
     },
     {
       "Sid": "SecretsManagerDBCredentials",
@@ -883,7 +541,7 @@ aws accessanalyzer create-analyzer \
       "Action": [
         "secretsmanager:GetSecretValue"
       ],
-      "Resource": "arn:aws:secretsmanager:us-east-1:037336516853:secret:spotify/db-*"
+      "Resource": "arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:spotify/db-*"
     },
     {
       "Sid": "CloudWatchLogging",
@@ -894,7 +552,7 @@ aws accessanalyzer create-analyzer \
         "logs:PutLogEvents",
         "logs:DescribeLogStreams"
       ],
-      "Resource": "arn:aws:logs:us-east-1:037336516853:log-group:/spotify/*"
+      "Resource": "arn:aws:logs:us-east-1:<ACCOUNT_ID>:log-group:/spotify/*"
     },
     {
       "Sid": "CloudWatchMetrics",
@@ -925,7 +583,6 @@ aws accessanalyzer create-analyzer \
 
 - **CloudWatchMetrics with namespace condition**: Custom metrics (API latency, error rates) go to a specific CloudWatch namespace. The condition prevents the instance from writing metrics to other namespaces — a subtle but important least-privilege constraint.
 
-\newpage
 
 # Security Architecture
 
@@ -958,40 +615,22 @@ VPC: 10.0.0.0/16 (65,536 IP addresses)
 
 **Root cause:** Security groups are stateful firewalls at the instance level. "Stateful" means if you allow inbound traffic on port 443, the return traffic is automatically allowed — you don't need an explicit outbound rule for the response.
 
-```
-Security Group: spotify-api-sg
+**Security Group: spotify-api-sg**
 
-INBOUND RULES:
-┌──────────┬──────────┬─────────────────────┬─────────────────────────────┐
-│ Protocol │ Port     │ Source              │ Root Cause                   │
-├──────────┼──────────┼─────────────────────┼─────────────────────────────┤
-│ TCP      │ 22       │ YOUR_IP/32          │ SSH access. /32 = single IP │
-│          │          │                     │ only. Never use 0.0.0.0/0   │
-│          │          │                     │ for SSH — bots scan port 22 │
-│          │          │                     │ continuously.               │
-├──────────┼──────────┼─────────────────────┼─────────────────────────────┤
-│ TCP      │ 443      │ 0.0.0.0/0           │ HTTPS API traffic from      │
-│          │          │                     │ CloudFront and direct        │
-│          │          │                     │ clients.                    │
-├──────────┼──────────┼─────────────────────┼─────────────────────────────┤
-│ TCP      │ 80       │ 0.0.0.0/0           │ HTTP (redirects to HTTPS).  │
-│          │          │                     │ Needed for Let's Encrypt    │
-│          │          │                     │ certificate validation.     │
-├──────────┼──────────┼─────────────────────┼─────────────────────────────┤
-│ TCP      │ 5432     │ 10.0.0.0/16         │ PostgreSQL — VPC internal   │
-│          │          │                     │ only. NEVER expose DB port  │
-│          │          │                     │ to the internet.            │
-└──────────┴──────────┴─────────────────────┴─────────────────────────────┘
+**Inbound Rules:**
 
-OUTBOUND RULES:
-┌──────────┬──────────┬─────────────────────┬─────────────────────────────┐
-│ Protocol │ Port     │ Destination         │ Root Cause                   │
-├──────────┼──────────┼─────────────────────┼─────────────────────────────┤
-│ All      │ All      │ 0.0.0.0/0           │ Instance needs to reach S3, │
-│          │          │                     │ Cognito, Secrets Manager,   │
-│          │          │                     │ CloudWatch, and OS updates. │
-└──────────┴──────────┴─────────────────────┴─────────────────────────────┘
-```
+| Protocol | Port | Source | Purpose |
+|----------|------|--------|---------|
+| TCP | 22 | YOUR_IP/32 | SSH access. /32 = single IP only. Never use 0.0.0.0/0 for SSH -- bots scan port 22 continuously. |
+| TCP | 443 | 0.0.0.0/0 | HTTPS API traffic from CloudFront and direct clients. |
+| TCP | 80 | 0.0.0.0/0 | HTTP (redirects to HTTPS). Needed for Let's Encrypt certificate validation. |
+| TCP | 5432 | 10.0.0.0/16 | PostgreSQL -- VPC internal only. NEVER expose DB port to the internet. |
+
+**Outbound Rules:**
+
+| Protocol | Port | Destination | Purpose |
+|----------|------|-------------|---------|
+| All | All | 0.0.0.0/0 | Instance needs to reach S3, Cognito, Secrets Manager, CloudWatch, and OS updates. |
 
 **Why port 22 is restricted to YOUR_IP/32:** Every publicly accessible SSH port gets brute-force attacked within minutes of going live. Restricting to your exact IP means only your network can even attempt a connection. When your IP changes (e.g., coffee shop), update the security group.
 
@@ -1010,7 +649,7 @@ OUTBOUND RULES:
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::spotify-audio-037336516853/*",
+      "Resource": "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>/*",
       "Condition": {
         "StringNotEquals": {
           "s3:x-amz-server-side-encryption": "AES256"
@@ -1023,8 +662,8 @@ OUTBOUND RULES:
       "Principal": "*",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::spotify-audio-037336516853",
-        "arn:aws:s3:::spotify-audio-037336516853/*"
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>",
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>/*"
       ],
       "Condition": {
         "Bool": {
@@ -1037,7 +676,7 @@ OUTBOUND RULES:
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:PutBucketPolicy",
-      "Resource": "arn:aws:s3:::spotify-audio-037336516853",
+      "Resource": "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>",
       "Condition": {
         "StringNotEquals": {
           "s3:x-amz-acl": "private"
@@ -1078,7 +717,7 @@ OUTBOUND RULES:
 ```powershell
 aws cloudtrail create-trail \
   --name spotify-audit-trail \
-  --s3-bucket-name spotify-cloudtrail-037336516853 \
+  --s3-bucket-name spotify-cloudtrail-<ACCOUNT_ID> \
   --is-multi-region-trail \
   --enable-log-file-validation
 
@@ -1134,7 +773,6 @@ aws configservice put-config-rule --config-rule '{
 }'
 ```
 
-\newpage
 
 # Terraform from Zero
 
@@ -1785,7 +1423,6 @@ terraform apply tfplan
 terraform destroy
 ```
 
-\newpage
 
 # CloudFormation Supplementary Templates
 
@@ -1924,7 +1561,6 @@ Outputs:
 | Import existing | `terraform import` | `aws cloudformation import` |
 | Destroy | `terraform destroy` (selective) | Delete stack (all-or-nothing) |
 
-\newpage
 
 # Application Layer Build
 
@@ -2040,7 +1676,6 @@ The API server implements the exact endpoint design from the Brain Dump. Impleme
 
 Each endpoint validates the Cognito JWT, queries PostgreSQL, and where applicable generates S3 presigned URLs.
 
-\newpage
 
 # Monitoring and Observability
 
@@ -2075,7 +1710,6 @@ resource "aws_sns_topic_subscription" "email" {
 }
 ```
 
-\newpage
 
 # Cost Management Deep Dive
 
@@ -2100,7 +1734,6 @@ resource "aws_sns_topic_subscription" "email" {
 2. **Reduce EBS to 10GB (-$0.80):** 300MB audio + PostgreSQL + OS fits in 10GB. 20GB gives breathing room.
 3. **Stop EC2 when not in use:** Instance charges stop when the EC2 is stopped. EBS charges continue. If you run the instance only 8 hours/day, compute drops to $2.53/mo.
 
-\newpage
 
 # Postmortem Report Simulation
 
@@ -2154,7 +1787,6 @@ The root cause is NOT a bug. It's a process failure:
 3. **Enable AWS Config rule `s3-bucket-level-public-access-prohibited`** — alerts on public access changes
 4. **Add S3 bucket policy that explicitly denies public access** — defense in depth beyond Block Public Access
 
-\newpage
 
 # GRC Section
 
@@ -2191,7 +1823,6 @@ This project demonstrates controls that map to common compliance frameworks:
 | CIS AWS Benchmark 1.5 | MFA on root | Enabled in account hardening |
 | CIS AWS Benchmark 2.1 | CloudTrail enabled | Multi-region trail with log validation |
 
-\newpage
 
 # AWS Well-Architected Framework Alignment
 
@@ -2223,63 +1854,27 @@ This project demonstrates controls that map to common compliance frameworks:
 | Make frequent, small, reversible changes | Git-based Terraform workflow | None |
 | Anticipate failure | Postmortem simulation, monitoring | No multi-AZ (budget) |
 
-\newpage
-
-# Interview Narrative Section
-
-## How to Talk About This Project
-
-This project is designed to answer three interview questions simultaneously:
-
-1. **"Tell me about a complex project you've worked on."** — This is a full-stack AWS deployment with IAM, networking, storage, compute, CDN, authentication, IaC, monitoring, and cost management.
-
-2. **"How do you approach security in cloud environments?"** — Point to the IAM policy design, VPC segmentation, encryption strategy, and the explicit root-cause reasoning behind each decision.
-
-3. **"Do you have hands-on experience with Terraform?"** — The entire infrastructure is defined in Terraform modules with proper state management, variable abstraction, and environment separation.
-
-## STAR Method Examples
-
-### Example 1: IAM Least Privilege
-
-- **Situation:** Building a Spotify-like AWS architecture as a portfolio project to demonstrate enterprise IAM patterns
-- **Task:** Design IAM policies that enforce least privilege while allowing five different simulated roles to function
-- **Action:** Created custom policies with resource-level ARN scoping, condition keys for region restriction, and explicit deny statements as guardrails. Implemented permission boundaries to cap maximum possible permissions. Set up IAM Access Analyzer to continuously validate no external access.
-- **Result:** Zero over-provisioned permissions. Every IAM entity can only access exactly the resources it needs. The SecurityAuditor role has read-only access with an explicit deny on all mutation actions, demonstrating defense-in-depth.
-
-### Example 2: Cost Optimization Under Constraints
-
-- **Situation:** Required to build a functional cloud architecture under a $10/month budget with expired Free Tier
-- **Task:** Deploy an EC2 instance, PostgreSQL database, S3 storage, CloudFront CDN, and Cognito authentication without exceeding $10
-- **Action:** Self-hosted PostgreSQL instead of RDS (saving $12.41/month), used gp3 EBS instead of gp2 (saving 20% on storage), leveraged CloudFront's always-free 1TB egress tier, and implemented budget alarms at $10/$15/$20
-- **Result:** Achieved full architecture deployment at $8-10/month. Documented the exact cost threshold ($12.41/month for db.t3.micro) where the RDS upgrade becomes justified, demonstrating that cost decisions are data-driven, not arbitrary.
-
-## Architecture Decision Justifications Quick Reference
-
-| Question | Answer |
-|----------|--------|
-| "Why EC2 over Lambda?" | Richer security surface (SGs, SSH hardening, VPC placement). Lambda doesn't demonstrate the networking skills an IAM/security role requires. |
-| "Why self-hosted PostgreSQL?" | RDS at $12.41/mo exceeds budget. Self-hosting demonstrates understanding of the operational tradeoffs and the exact inflection point where managed services become justified. |
-| "Why Cognito + JWT hybrid?" | Mirrors enterprise pattern: managed IdP for human identity, custom tokens for machine identity. Shows understanding of both. |
-| "Why Terraform over CDK?" | Most in-demand IaC tool, cloud-agnostic, readable by non-developers (auditors, compliance). CDK requires a programming language; HCL is purpose-built. |
-| "Why not containers?" | Single-instance budget constraint. But the Terraform modules are written to support ECS Fargate migration — the upgrade path is documented and ready. |
-
-\newpage
 
 # Appendix A: Database Schema Reference
 
 Exact schema from the Brain Dump ERD:
 
-```
-users             artists           songs              playlists          playlistitems       artistsongs
-─────────         ─────────         ─────────          ──────────         ──────────────      ────────────
-UserID (PK)       ArtistID (PK)     SongID (PK)        PlaylistID (PK)    PlaylistID (PK,FK)  SongID (PK,FK)
-Email (unique)    Name              Title              OwnerID (FK)       Position            ArtistID (PK,FK)
-PasswordHash      Country           Duration           Name               AddedAt
-CreatedAt         Bio               ReleaseDate        CreatedAt          SongID (FK)
-LastLogin         ImageURL          FileURL
-SubscriptionType  CreateAt          CreatedAt
-Country           UpdatedAt         ArtistID (FK)
-```
+| users | artists | songs |
+|-------|---------|-------|
+| UserID (PK) | ArtistID (PK) | SongID (PK) |
+| Email (unique) | Name | Title |
+| PasswordHash | Country | Duration |
+| CreatedAt | Bio | ReleaseDate |
+| LastLogin | ImageURL | FileURL |
+| SubscriptionType | CreatedAt | CreatedAt |
+| Country | UpdatedAt | ArtistID (FK) |
+
+| playlists | playlistitems | artistsongs |
+|-----------|---------------|-------------|
+| PlaylistID (PK) | PlaylistID (PK,FK) | SongID (PK,FK) |
+| OwnerID (FK) | Position | ArtistID (PK,FK) |
+| Name | AddedAt | |
+| CreatedAt | SongID (FK) | |
 
 # Appendix B: REST API Quick Reference
 
@@ -2336,8 +1931,8 @@ aws sts get-caller-identity
 aws ec2 describe-instances --filters "Name=tag:Project,Values=spotify"
 
 # S3
-aws s3 ls s3://spotify-audio-037336516853/
-aws s3 cp local-file.ogg s3://spotify-audio-037336516853/artist/1/album/1/song1.ogg
+aws s3 ls s3://spotify-audio-<ACCOUNT_ID>/
+aws s3 cp local-file.ogg s3://spotify-audio-<ACCOUNT_ID>/artist/1/album/1/song1.ogg
 
 # IAM
 aws iam list-users
@@ -2351,7 +1946,6 @@ aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,Attribut
 aws secretsmanager get-secret-value --secret-id spotify/db-credentials
 ```
 
-\newpage
 
 # Addendum: Walkthrough Guidance Notes
 
@@ -2421,10 +2015,10 @@ The t3.micro bills $0.0104/hour ($0.25/day, $7.59/month). To save costs when not
 
 ```bash
 # Stop (EBS charges continue, compute stops)
-aws ec2 stop-instances --instance-ids i-0c94b3606f81af2f1
+aws ec2 stop-instances --instance-ids i-<REDACTED>
 
 # Start (same public IP because of Elastic IP)
-aws ec2 start-instances --instance-ids i-0c94b3606f81af2f1
+aws ec2 start-instances --instance-ids i-<REDACTED>
 ```
 
 ## Companion Documents

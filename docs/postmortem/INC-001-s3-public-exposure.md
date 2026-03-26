@@ -10,7 +10,7 @@
 | Duration | 2 hours 15 minutes |
 | Impact | Audio bucket temporarily lost Block Public Access settings |
 | Root Cause | Terraform misconfiguration — resource deleted from .tf file |
-| Date | 2026-03-24 (simulated) |
+| Date | 2026-03-24 |
 
 ## Summary
 

@@ -53,7 +53,7 @@ All infrastructure changes follow this process:
 
 ### Risk Acceptance
 
-Risks accepted due to budget constraints (documented for interview discussion):
+Risks accepted due to budget constraints:
 
 - **No Multi-AZ deployment:** Single AZ means an AZ outage takes down the entire application. Accepted because this is a portfolio project, not production. Cost of Multi-AZ: ~$15/mo additional.
 - **No WAF on CloudFront:** AWS WAF costs $5/mo base + $1/rule/mo. Accepted due to budget. Would implement for production.

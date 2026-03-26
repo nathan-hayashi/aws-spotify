@@ -1,5 +1,7 @@
 # AWS-Spotify Project — Directory Navigation
 
+> **Archive Notice:** This project's AWS infrastructure has been decommissioned. Resource identifiers shown below are historical references.
+
 > This file maps every folder in the repository: what it is, why it exists, what it contains, how to use it, and where it is located. This file must be reviewed and updated whenever the project structure changes.
 
 ---
@@ -97,7 +99,7 @@ The project root. Contains top-level config files and all project subdirectories
 cd /mnt/c/dev/aws-spotify/frontend
 npm run dev      # Local dev server
 npm run build    # Build for production
-aws s3 sync dist/ s3://spotify-frontend-037336516853/ --delete   # Deploy to S3
+aws s3 sync dist/ s3://spotify-frontend-<ACCOUNT_ID>/ --delete   # Deploy to S3
 ```
 **Deployed at:** CloudFront distribution URL (via `terraform output cloudfront_url`)
 
@@ -243,9 +245,9 @@ Reusable Terraform modules. Each module is self-contained with its own variables
 |-------------|----------|------------|
 | VPC | spotify-vpc (10.0.0.0/16) | Terraform |
 | EC2 | spotify-api-server (t3.micro) | Terraform |
-| EIP | spotify-api-eip (34.195.227.70) | Terraform |
-| S3 | spotify-audio-037336516853 | Terraform |
-| S3 | spotify-frontend-037336516853 | Terraform |
+| EIP | spotify-api-eip (<REDACTED>) | Terraform |
+| S3 | spotify-audio-<ACCOUNT_ID> | Terraform |
+| S3 | spotify-frontend-<ACCOUNT_ID> | Terraform |
 | CloudFront | spotify-cdn | Terraform |
 | Cognito | spotify-users pool | Terraform |
 | SNS | spotify-alerts topic | Terraform |
@@ -255,7 +257,7 @@ Reusable Terraform modules. Each module is self-contained with its own variables
 | CloudTrail | spotify-audit-trail | AWS CLI |
 | GuardDuty | Detector (15-min publishing) | AWS CLI |
 | AWS Config | 4 compliance rules (S3 encryption, EC2 in VPC, root MFA, root access key) | AWS CLI |
-| S3 | spotify-cloudtrail-037336516853 | AWS CLI |
+| S3 | spotify-cloudtrail-<ACCOUNT_ID> | AWS CLI |
 
 ---
 
@@ -273,5 +275,5 @@ terraform output
 
 # PostgreSQL (on EC2)
 sudo -u postgres psql spotify
-psql -h 127.0.0.1 -U spotify_app -d spotify   # password: SpotifyDev2026!
+psql -h 127.0.0.1 -U spotify_app -d spotify
 ```

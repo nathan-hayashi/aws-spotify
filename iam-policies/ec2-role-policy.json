@@ -11,8 +11,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::spotify-audio-037336516853",
-        "arn:aws:s3:::spotify-audio-037336516853/*"
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>",
+        "arn:aws:s3:::spotify-audio-<ACCOUNT_ID>/*"
       ]
     },
     {
@@ -21,7 +21,7 @@
       "Action": [
         "secretsmanager:GetSecretValue"
       ],
-      "Resource": "arn:aws:secretsmanager:us-east-1:037336516853:secret:spotify/db-*"
+      "Resource": "arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:spotify/db-*"
     },
     {
       "Sid": "CloudWatchLogging",
@@ -32,7 +32,7 @@
         "logs:PutLogEvents",
         "logs:DescribeLogStreams"
       ],
-      "Resource": "arn:aws:logs:us-east-1:037336516853:log-group:/spotify/*"
+      "Resource": "arn:aws:logs:us-east-1:<ACCOUNT_ID>:log-group:/spotify/*"
     },
     {
       "Sid": "CloudWatchMetrics",

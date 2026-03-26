@@ -44,5 +44,43 @@ ssh/
 
 node_modules/
 
+# Sensitive logs
+debugging-log.txt
+wsl-history-full.txt
 
+# App scaffolding (code deployed to EC2, local dirs empty)
+app/
+
+# Terraform plan binary
+terraform/environments/dev/tfplan
+
+# Build artifacts
+frontend/dist/
+
+# PDF documentation (keep .md source only)
+docs/**/*.pdf
+docs/*.pdf
+
+# Editor state
+.vscode/
+
+# Diagrams excluded from publication
+docs/diagrams/2-Subnet.png
+docs/diagrams/3-RouteTable.png
+docs/diagrams/5-SGoutboundRules.png
+docs/diagrams/8-ec2InstanceElasticIP.png
+docs/diagrams/9-ec2KeyPairs.png
+docs/diagrams/12-S3bucketVersioning.png
+docs/diagrams/19-FrontendContents.png
+docs/diagrams/23-CF-ErrorPages.png
+docs/diagrams/25-IAMspotifyDevelopers.png
+docs/diagrams/26-IAMsecurityAuditors.png
+docs/diagrams/29-IAMjsonPolicy.png
+docs/diagrams/34-CognitoAppClients.png
+docs/diagrams/37-SNStopic.png
+docs/diagrams/43-ClickPlayAnySong.png
+docs/diagrams/46-SongListJson.png
+docs/diagrams/47-SingleSongWithPresignedURL.png
+docs/diagrams/48-SearchResultsJSON.png
+docs/diagrams/AWSConsoleScreenshotGuide.txt
 
