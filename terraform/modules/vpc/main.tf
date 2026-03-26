@@ -147,3 +147,12 @@ output "public_subnet_id" {
 output "api_security_group_id" {
   value = aws_security_group.api.id
 }
+
+resource "aws_vpc_security_group_ingress_rule" "api" {
+  security_group_id = aws_security_group.api.id
+  description       = "API server port"
+  from_port         = 3000
+  to_port           = 3000
+  ip_protocol       = "tcp"
+  cidr_ipv4         = "0.0.0.0/0"
+}

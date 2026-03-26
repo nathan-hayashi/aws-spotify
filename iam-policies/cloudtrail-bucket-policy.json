@@ -8,7 +8,7 @@
         "Service": "cloudtrail.amazonaws.com"
       },
       "Action": "s3:GetBucketAcl",
-      "Resource": "arn:aws:s3:::spotify-cloudtrail-037336516853"
+      "Resource": "arn:aws:s3:::spotify-cloudtrail-<ACCOUNT_ID>"
     },
     {
       "Sid": "AWSCloudTrailWrite",
@@ -17,7 +17,7 @@
         "Service": "cloudtrail.amazonaws.com"
       },
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::spotify-cloudtrail-037336516853/AWSLogs/037336516853/*",
+      "Resource": "arn:aws:s3:::spotify-cloudtrail-<ACCOUNT_ID>/AWSLogs/<ACCOUNT_ID>/*",
       "Condition": {
         "StringEquals": {
           "s3:x-amz-acl": "bucket-owner-full-control"
