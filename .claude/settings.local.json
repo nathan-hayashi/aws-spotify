@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(threshold-router)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "sequential-thinking",
+    "github"
+  ]
+}
